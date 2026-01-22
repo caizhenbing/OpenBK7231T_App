@@ -1,14 +1,12 @@
 name: Build App
 on:
   push:
-#    branches:
+    branches:
 #      - '**'
-        tags:
   - '1.15.703'
   pull_request:
-#    branches: 
+    branches: 
 #      - '**'
-    tags:
   - '1.15.703'
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
