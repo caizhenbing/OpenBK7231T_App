@@ -45,14 +45,14 @@ jobs:
           echo "short_ref: ${BRANCHTRANSLATED}"
           export VERSION="1.15.703"
           if [ "${{ github.ref }}" = "refs/heads/main" ] && [ -n "${{ env.TAG_VERSION }}" ]; then
-      export VERSION="${{ env.TAG_VERSION }}"
-     echo "使用指定的tag版本: ${VERSION}"
-        elif ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
-        export VERSION=${{ steps.semantic.outputs.new_release_version }}
-         else
-       export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
-       fi
-    
+          export VERSION="${{ env.TAG_VERSION }}"
+          echo "使用指定的tag版本: ${VERSION}"
+          elif ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
+          export VERSION=${{ steps.semantic.outputs.new_release_version }}
+          else
+          export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+          fi
+
        echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
        echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
        echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
