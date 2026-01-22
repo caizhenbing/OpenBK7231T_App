@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - '**'
-  pull_request:
-    branches: 
-      - '**'
     tags:
       - 'v*'
       - '1.15.703'
+  pull_request:
+    branches: 
+      - '**'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -27,6 +27,10 @@ jobs:
     steps:
       - name: Source checkout
         uses: actions/checkout@v4
+        with:
+          # 修复：设置为 true 以获取标签信息
+          fetch-tags: true
+          # 其他参数保持不变...
         
       - name: Semantic Release
         id: semantic
@@ -45,16 +49,30 @@ jobs:
       - name: Set outputs
         id: refs
         run: |
+          echo "GITHUB_REF: $GITHUB_REF"
+          echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
+          
+          # 获取标签信息（用于调试）
+          echo "Available tags:"
+          git tag --list | head -10
+          
           export BRANCH=${GITHUB_REF#refs/*/}
           echo "branch: ${BRANCH}"
           export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
           echo "short_ref: ${BRANCHTRANSLATED}"
+          
           export VERSION=""
           if [[ "${{ steps.semantic.outputs.new_release_published }}" == "true" ]]; then
-            export VERSION=${{ steps.semantic.outputs.new_release_version }}
+            export VERSION="${{ steps.semantic.outputs.new_release_version }}"
           else
-            export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+            # 如果是标签推送，使用标签名作为版本
+            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+              export VERSION="${BRANCHTRANSLATED}"
+            else
+              export VERSION="${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)"
+            fi
           fi
+          
           echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
           echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
           echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
