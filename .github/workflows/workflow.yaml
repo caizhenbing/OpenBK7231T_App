@@ -1,15 +1,17 @@
 name: Build App
-
 on:
   push:
     branches:
       - '**'
-    tags:
-      - 'v*'
-      - '1.15.703'
   pull_request:
     branches: 
       - '**'
+  workflow_dispatch:  # 添加手动触发
+    inputs:
+      tag_name:
+        description: '1.15.703'
+        required: false
+        type: string
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -24,17 +26,27 @@ jobs:
       short_ref: ${{ steps.refs.outputs.short_ref }}
       version: ${{ steps.refs.outputs.version }}
       new_release: ${{ steps.refs.outputs.new_release }}
+      is_specific_tag: ${{ steps.refs.outputs.is_specific_tag }}
     steps:
+      - name: 检查输入参数
+        id: check_input
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            echo "使用指定的tag: ${{ github.event.inputs.tag_name }}"
+            echo "is_specific_tag=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_specific_tag=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Source checkout
         uses: actions/checkout@v4
         with:
-          # 修复：设置为 true 以获取标签信息
-          fetch-tags: true
-          # 其他参数保持不变...
-        
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || '' }}
+          
       - name: Semantic Release
         id: semantic
-        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
+        # 当手动指定tag时不运行semantic-release
+        if: (github.ref == 'refs/heads/main' || github.ref_name == 'alpha') && steps.check_input.outputs.is_specific_tag == 'false'
         uses: cycjimmy/semantic-release-action@v4
         with:
           dry_run: true
@@ -49,34 +61,33 @@ jobs:
       - name: Set outputs
         id: refs
         run: |
-          echo "GITHUB_REF: $GITHUB_REF"
-          echo "GITHUB_REF_NAME: $GITHUB_REF_NAME"
-          
-          # 获取标签信息（用于调试）
-          echo "Available tags:"
-          git tag --list | head -10
-          
-          export BRANCH=${GITHUB_REF#refs/*/}
-          echo "branch: ${BRANCH}"
-          export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
-          echo "short_ref: ${BRANCHTRANSLATED}"
-          
-          export VERSION=""
-          if [[ "${{ steps.semantic.outputs.new_release_published }}" == "true" ]]; then
-            export VERSION="${{ steps.semantic.outputs.new_release_version }}"
+          # 手动指定tag的情况
+          if [ "${{ steps.check_input.outputs.is_specific_tag }}" = "true" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+            echo "使用指定的tag: ${TAG_NAME}"
+            echo "short_ref=${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
+            echo "version=${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "is_specific_tag=true" >> $GITHUB_OUTPUT
           else
-            # 如果是标签推送，使用标签名作为版本
-            if [[ "$GITHUB_REF" == refs/tags/* ]]; then
-              export VERSION="${BRANCHTRANSLATED}"
+            # 原有逻辑
+            export BRANCH=${GITHUB_REF#refs/*/}
+            echo "branch: ${BRANCH}"
+            export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+            echo "short_ref: ${BRANCHTRANSLATED}"
+            export VERSION=""
+            if ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
+              export VERSION=${{ steps.semantic.outputs.new_release_version }}
             else
-              export VERSION="${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)"
+              export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
             fi
+            echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
+            echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
+            echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "is_specific_tag=false" >> $GITHUB_OUTPUT
           fi
-          
-          echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
-          echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
-          echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
   build2:
     name: Build Simulator
