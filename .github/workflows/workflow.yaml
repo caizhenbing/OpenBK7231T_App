@@ -8,8 +8,8 @@ on:
       - '**'
   workflow_dispatch:  # 添加手动触发
     inputs:
-      tag_name:
-        description: '1.15.703'
+      tag_name: '1.15.703'
+        description: '指定要编译的tag版本（仅适用于main分支）'
         required: true
         type: string
 
