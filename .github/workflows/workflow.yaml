@@ -3,11 +3,11 @@ on:
   push:
     branches:
       - '**'
-  tags:
-      - '1.15.703'
   pull_request:
     branches: 
       - '**'
+  release:
+    types: [created]
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
