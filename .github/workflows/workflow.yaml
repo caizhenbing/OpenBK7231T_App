@@ -6,12 +6,6 @@ on:
   pull_request:
     branches: 
       - '**'
-  workflow_dispatch:  # 添加手动触发
-    inputs:
-      tag_name: '1.15.703'
-        description: '指定要编译的tag版本（仅适用于main分支）'
-        required: true
-        type: string
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -26,28 +20,12 @@ jobs:
       short_ref: ${{ steps.refs.outputs.short_ref }}
       version: ${{ steps.refs.outputs.version }}
       new_release: ${{ steps.refs.outputs.new_release }}
-      is_specific_tag: ${{ steps.refs.outputs.is_specific_tag }}
     steps:
-      - name: 检查输入参数
-        id: check_input
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ github.event.inputs.tag_name }}" ]; then
-            echo "使用指定的tag: ${{ github.event.inputs.tag_name }}"
-            echo "is_specific_tag=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_specific_tag=false" >> $GITHUB_OUTPUT
-          fi
-      
       - name: Source checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name || '' }}
-          fetch-tags: true
-          
       - name: Semantic Release
         id: semantic
-        # 当手动指定tag时不运行semantic-release
-        if: (github.ref == 'refs/heads/main' || github.ref_name == 'alpha') && steps.check_input.outputs.is_specific_tag == 'false'
+        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
         uses: cycjimmy/semantic-release-action@v4
         with:
           dry_run: true
@@ -58,37 +36,27 @@ jobs:
             conventional-changelog-conventionalcommits@7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
       - name: Set outputs
         id: refs
         run: |
-          # 手动指定tag的情况
-          if [ "${{ steps.check_input.outputs.is_specific_tag }}" = "true" ]; then
-            TAG_NAME="${{ github.event.inputs.tag_name }}"
-            echo "使用指定的tag: ${TAG_NAME}"
-            echo "short_ref=${TAG_NAME}" >> $GITHUB_OUTPUT
-            echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
-            echo "version=${TAG_NAME}" >> $GITHUB_OUTPUT
-            echo "new_release=false" >> $GITHUB_OUTPUT
-            echo "is_specific_tag=true" >> $GITHUB_OUTPUT
-          else
-            # 原有逻辑
-            export BRANCH=${GITHUB_REF#refs/*/}
-            echo "branch: ${BRANCH}"
-            export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
-            echo "short_ref: ${BRANCHTRANSLATED}"
-            export VERSION=""
-            if ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
-              export VERSION=${{ steps.semantic.outputs.new_release_version }}
-            else
-              export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
-            fi
-            echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
-            echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
-            echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
-            echo "version=${VERSION}" >> $GITHUB_OUTPUT
-            echo "is_specific_tag=false" >> $GITHUB_OUTPUT
-          fi
+          export BRANCH=${GITHUB_REF#refs/*/}
+          echo "branch: ${BRANCH}"
+          export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+          echo "short_ref: ${BRANCHTRANSLATED}"
+          export VERSION="1.15.703"
+          if [ "${{ github.ref }}" = "refs/heads/main" ] && [ -n "${{ env.TAG_VERSION }}" ]; then
+      export VERSION="${{ env.TAG_VERSION }}"
+     echo "使用指定的tag版本: ${VERSION}"
+        elif ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
+        export VERSION=${{ steps.semantic.outputs.new_release_version }}
+         else
+       export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+       fi
+    
+       echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
+       echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
+       echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
+       echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
   build2:
     name: Build Simulator
