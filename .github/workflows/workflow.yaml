@@ -4,12 +4,12 @@ on:
   push:
     branches:
       - '**'
-    tags:
-      - 'v*'
-      - '1.15.703'
   pull_request:
     branches: 
       - '**'
+    tags:
+      - 'v*'
+      - '1.15.703'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
