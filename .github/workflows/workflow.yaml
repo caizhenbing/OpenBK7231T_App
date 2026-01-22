@@ -1,16 +1,15 @@
 name: Build App
 on:
   push:
-  tags:
+#    branches:
+#      - '**'
+        tags:
   - '1.15.703'
-    branches:
-      - '**'
   pull_request:
+#    branches: 
+#      - '**'
     tags:
   - '1.15.703'
-    branches: 
-      - '**'
-
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
