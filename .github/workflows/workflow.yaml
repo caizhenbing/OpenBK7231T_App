@@ -1,8 +1,8 @@
 name: Build App
 on:
   push:
-    branches:
-      - '**'
+#    branches:
+#      - '**'
       tags:
       - '1.15.703'
   pull_request:
