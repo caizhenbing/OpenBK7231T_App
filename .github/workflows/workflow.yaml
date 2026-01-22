@@ -1,8 +1,8 @@
 name: Build App
 on:
   push:
-#    branches:
-#      - '**'
+    branches:
+      - '**'
       tags:
       - '1.15.703'
   pull_request:
@@ -23,12 +23,24 @@ jobs:
       short_ref: ${{ steps.refs.outputs.short_ref }}
       version: ${{ steps.refs.outputs.version }}
       new_release: ${{ steps.refs.outputs.new_release }}
+      is_tag: ${{ steps.refs.outputs.is_tag }}
     steps:
       - name: Source checkout
         uses: actions/checkout@v4
+        
+      - name: Set tag flag
+        id: tag_check
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+            echo "tag_name=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "is_tag=false" >> $GITHUB_OUTPUT
+          fi
+          
       - name: Semantic Release
         id: semantic
-        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
+        if: (github.ref == 'refs/heads/main' || github.ref_name == 'alpha') && steps.tag_check.outputs.is_tag == 'false'
         uses: cycjimmy/semantic-release-action@v4
         with:
           dry_run: true
@@ -44,6 +56,13 @@ jobs:
         run: |
           export BRANCH=${GITHUB_REF#refs/*/}
           echo "branch: ${BRANCH}"
+          # 如果是 tag，使用 tag 名称
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+            export VERSION=${BRANCHTRANSLATED}
+            echo "is_tag=true" >> $GITHUB_OUTPUT
+          else
+          # 分支的处理逻辑
           export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
           echo "short_ref: ${BRANCHTRANSLATED}"
           export VERSION=""
