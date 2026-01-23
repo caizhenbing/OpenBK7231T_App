@@ -6,6 +6,18 @@ on:
   pull_request:
     branches: 
       - '**'
+  workflow_dispatch:  # 添加手动触发功能
+    inputs:
+      tag_name:
+        description: '指定要编译的tag版本（支持所有历史tag）'
+        required: true
+        type: string
+        default: '1.15.703'
+      target_branch:
+        description: '基于哪个分支编译（默认main）'
+        required: false
+        type: string
+        default: 'main'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -20,12 +32,56 @@ jobs:
       short_ref: ${{ steps.refs.outputs.short_ref }}
       version: ${{ steps.refs.outputs.version }}
       new_release: ${{ steps.refs.outputs.new_release }}
+      is_specific_tag: ${{ steps.refs.outputs.is_specific_tag }}
+      tag_commit_sha: ${{ steps.refs.outputs.tag_commit_sha }}
     steps:
+      - name: 验证tag存在性
+        id: validate_tag
+        run: |
+          # 先获取所有tags，验证输入的tag是否存在
+          echo "Fetching all tags..."
+          git fetch --tags --force
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+            echo "检查tag是否存在: $TAG_NAME"
+            if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
+              echo "✅ Tag $TAG_NAME 存在"
+              echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
+              echo "tag_exists=true" >> $GITHUB_OUTPUT
+              COMMIT_SHA=$(git rev-list -n 1 "$TAG_NAME")
+              echo "tag_commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Tag $TAG_NAME 不存在"
+              echo "tag_exists=false" >> $GITHUB_OUTPUT
+              exit 1
+            fi
+          else
+            echo "没有指定tag，将按原有逻辑运行"
+            echo "tag_exists=false" >> $GITHUB_OUTPUT
+          fi
+      
       - name: Source checkout
         uses: actions/checkout@v4
+        with:
+          # 如果指定了tag，checkout到该tag
+          ref: ${{ steps.validate_tag.outputs.tag_exists == 'true' && github.event.inputs.tag_name || github.ref }}
+          fetch-depth: 0  # 获取完整历史，以便访问所有tags
+          
+      - name: 检出特定commit（如果tag指向非HEAD）
+        if: steps.validate_tag.outputs.tag_exists == 'true'
+        run: |
+          # 确保我们精确地在tag所在的commit上
+          TAG_NAME="${{ github.event.inputs.tag_name }}"
+          COMMIT_SHA="${{ steps.validate_tag.outputs.tag_commit_sha }}"
+          echo "正在检出tag $TAG_NAME 对应的commit: $COMMIT_SHA"
+          git checkout $COMMIT_SHA
+          
       - name: Semantic Release
         id: semantic
-        if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
+        # 仅在未指定tag且是main/alpha分支时才运行semantic-release
+        if: |
+          steps.validate_tag.outputs.tag_exists != 'true' && 
+          (github.ref == 'refs/heads/main' || github.ref_name == 'alpha')
         uses: cycjimmy/semantic-release-action@v4
         with:
           dry_run: true
@@ -36,27 +92,54 @@ jobs:
             conventional-changelog-conventionalcommits@7
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
       - name: Set outputs
         id: refs
         run: |
-          export BRANCH=${GITHUB_REF#refs/*/}
-          echo "branch: ${BRANCH}"
-          export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
-          echo "short_ref: ${BRANCHTRANSLATED}"
-          export VERSION="1.15.703"
-          if [ "${{ github.ref }}" = "refs/heads/main" ] && [ -n "${{ env.TAG_VERSION }}" ]; then
-          export VERSION="${{ env.TAG_VERSION }}"
-          echo "使用指定的tag版本: ${VERSION}"
-          elif ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
-          export VERSION=${{ steps.semantic.outputs.new_release_version }}
+          # 如果是手动指定的tag
+          if [ "${{ steps.validate_tag.outputs.tag_exists }}" = "true" ]; then
+            TAG_NAME="${{ github.event.inputs.tag_name }}"
+            echo "🔧 编译指定tag: ${TAG_NAME}"
+            
+            # 获取tag信息
+            TAG_COMMIT=$(git rev-parse --short=12 HEAD)
+            TAG_MESSAGE=$(git tag -l --format='%(contents)' "$TAG_NAME" | head -1 || echo "")
+            
+            echo "Tag Commit: ${TAG_COMMIT}"
+            echo "Tag Message: ${TAG_MESSAGE}"
+            
+            # 设置输出
+            echo "short_ref=${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "sha_short=SHA-${TAG_COMMIT}" >> $GITHUB_OUTPUT
+            echo "version=${TAG_NAME}" >> $GITHUB_OUTPUT
+            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "is_specific_tag=true" >> $GITHUB_OUTPUT
+            echo "tag_commit_sha=${TAG_COMMIT}" >> $GITHUB_OUTPUT
           else
-          export VERSION=${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)
+            # 原有分支逻辑
+            echo "📋 使用分支构建逻辑"
+            export BRANCH=${GITHUB_REF#refs/*/}
+            echo "当前分支: ${BRANCH}"
+            
+            export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
+            echo "转换后分支名: ${BRANCHTRANSLATED}"
+            
+            export VERSION=""
+            if ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
+              export VERSION=${{ steps.semantic.outputs.new_release_version }}
+              echo "使用semantic-release版本: ${VERSION}"
+            else
+              export VERSION="${BRANCHTRANSLATED}_$(git rev-parse --short=12 HEAD)"
+              echo "使用分支+commit版本: ${VERSION}"
+            fi
+            
+            echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
+            echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
+            echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
+            echo "version=${VERSION}" >> $GITHUB_OUTPUT
+            echo "is_specific_tag=false" >> $GITHUB_OUTPUT
+            echo "tag_commit_sha=" >> $GITHUB_OUTPUT
           fi
-
-       echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
-       echo "short_ref=${BRANCHTRANSLATED}" >> $GITHUB_OUTPUT
-       echo "sha_short=SHA-$(git rev-parse --short=12 HEAD)" >> $GITHUB_OUTPUT
-       echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
   build2:
     name: Build Simulator
