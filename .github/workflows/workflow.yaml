@@ -5,8 +5,9 @@ on:
       - '**'
   pull_request:
     branches: 
-      - '1.15.703'
-
+       - '**'
+     tag:
+       - '1.15.703'
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
@@ -24,14 +25,13 @@ jobs:
       - name: Source checkout
         uses: actions/checkout@v4
         with:
-         fetch-tags: 1.15.703
+         fetch-tags: true
       - name: Semantic Release
         id: semantic
         if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
         uses: cycjimmy/semantic-release-action@v4
         with:
           dry_run: true
-          fetch-tags: 1.15.703
           semantic_version: 21
           extra_plugins: |
             @semantic-release/changelog
