@@ -19,20 +19,19 @@ jobs:
       sha_short: ${{ steps.refs.outputs.sha_short }}
       short_ref: ${{ steps.refs.outputs.short_ref }}
       version: ${{ steps.refs.outputs.version }}
- #     version: '1.15.703'
       new_release: ${{ steps.refs.outputs.new_release }}
     steps:
       - name: Source checkout
         uses: actions/checkout@v4
         with:
-         fetch-tags: true
+         fetch-tags: 1.15.703
       - name: Semantic Release
         id: semantic
         if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
         uses: cycjimmy/semantic-release-action@v4
         with:
           dry_run: true
-          fetch-tags: true
+          fetch-tags: 1.15.703
           semantic_version: 21
           extra_plugins: |
             @semantic-release/changelog
