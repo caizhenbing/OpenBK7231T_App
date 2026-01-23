@@ -5,7 +5,7 @@ on:
       - '**'
   pull_request:
     branches: 
-      - '**'
+      - '1.15.703'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -18,8 +18,8 @@ jobs:
     outputs:
       sha_short: ${{ steps.refs.outputs.sha_short }}
       short_ref: ${{ steps.refs.outputs.short_ref }}
-#      version: ${{ steps.refs.outputs.version }}
-      version: 1.15.703
+      version: ${{ steps.refs.outputs.version }}
+ #     version: '1.15.703'
       new_release: ${{ steps.refs.outputs.new_release }}
     steps:
       - name: Source checkout
