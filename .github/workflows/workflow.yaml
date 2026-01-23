@@ -5,7 +5,7 @@ on:
       - '**'
   pull_request:
     branches: 
-       - 'tags/1.15.703'
+       - 'releases/**'
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
