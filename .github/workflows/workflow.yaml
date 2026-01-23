@@ -30,7 +30,9 @@ jobs:
         if: github.ref == 'refs/heads/main' || github.ref_name == 'alpha'
         uses: cycjimmy/semantic-release-action@v4
         with:
-          dry_run: true
+          ref: 1.15.703
+          fetch-tags: true
+ #         dry_run: true
           semantic_version: 21
           extra_plugins: |
             @semantic-release/changelog
