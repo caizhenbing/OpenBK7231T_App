@@ -2,26 +2,25 @@ name: Build App
 on:
   push:
     branches:
-      - '**'
+      - main
+      - alpha
+      - beta
+    tags:
+#      - 'v*'           # 匹配所有v开头的tag，如v1.0.0, v2.3.4
+#      - 'release-*'    # 匹配所有release-开头的tag
+#      - 'build-*'      # 匹配所有build-开头的tag
+      # 添加更多tag模式，或者使用具体tag名称
+      - 'specific-tag-name'  # 编译特定的tag
+      
   pull_request:
     branches: 
       - '**'
-  workflow_dispatch:  # 添加手动触发功能
-    inputs:
-      tag_name:
-        description: '指定要编译的tag版本（支持所有历史tag）'
-        required: true
-        type: string
-        default: '1.15.703'
-      target_branch:
-        description: '基于哪个分支编译（默认main）'
-        required: false
-        type: string
-        default: 'main'
 
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
+  # 在这里指定要编译的tag（如果需要固定tag）
+  TARGET_TAG: "1.15.703"
 
 jobs:
   refs:
@@ -32,32 +31,73 @@ jobs:
       short_ref: ${{ steps.refs.outputs.short_ref }}
       version: ${{ steps.refs.outputs.version }}
       new_release: ${{ steps.refs.outputs.new_release }}
-      is_specific_tag: ${{ steps.refs.outputs.is_specific_tag }}
-      tag_commit_sha: ${{ steps.refs.outputs.tag_commit_sha }}
+      is_tag_build: ${{ steps.refs.outputs.is_tag_build }}
     steps:
-      - name: 验证tag存在性
-        id: validate_tag
+      - name: Source checkout
+        uses: actions/checkout@v4
+        with:
+          # 如果是tag推送，checkout到该tag
+          # 如果是分支推送，使用默认逻辑
+          ref: ${{ startsWith(github.ref, 'refs/tags/') && github.ref || '' }}
+          fetch-depth: 0  # 获取完整历史
+          
+      - name: Semantic Release
+        id: semantic
+        # 仅在分支推送（非tag）时运行semantic-release
+        if: |
+          startsWith(github.ref, 'refs/heads/') && 
+          (github.ref == 'refs/heads/main' || github.ref_name == 'alpha')
+        uses: cycjimmy/semantic-release-action@v4
+        with:
+          dry_run: true
+          semantic_version: 21
+          extra_plugins: |
+            @semantic-release/changelog
+            @semantic-release/git
+            conventional-changelog-conventionalcommits@7
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Set outputs
+        id: refs
         run: |
-          # 先获取所有tags，验证输入的tag是否存在
-          echo "Fetching all tags..."
-          git fetch --tags --force
-          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
-            TAG_NAME="${{ github.event.inputs.tag_name }}"
-            echo "检查tag是否存在: $TAG_NAME"
-            if git rev-parse "$TAG_NAME" >/dev/null 2>&1; then
-              echo "✅ Tag $TAG_NAME 存在"
-              echo "tag_name=$TAG_NAME" >> $GITHUB_OUTPUT
-              echo "tag_exists=true" >> $GITHUB_OUTPUT
-              COMMIT_SHA=$(git rev-list -n 1 "$TAG_NAME")
-              echo "tag_commit_sha=$COMMIT_SHA" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Tag $TAG_NAME 不存在"
-              echo "tag_exists=false" >> $GITHUB_OUTPUT
-              exit 1
-            fi
+          # 检查是否是tag推送
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            # Tag推送逻辑
+            TAG_NAME=${GITHUB_REF#refs/tags/}
+            COMMIT_SHA=$(git rev-parse --short=12 HEAD)
+            
+            echo "🏷️ 编译tag: $TAG_NAME"
+            echo "🔗 Commit: $COMMIT_SHA"
+            
+            echo "short_ref=$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "sha_short=SHA-$COMMIT_SHA" >> $GITHUB_OUTPUT
+            echo "version=$TAG_NAME" >> $GITHUB_OUTPUT
+            echo "new_release=false" >> $GITHUB_OUTPUT
+            echo "is_tag_build=true" >> $GITHUB_OUTPUT
+            
           else
-            echo "没有指定tag，将按原有逻辑运行"
-            echo "tag_exists=false" >> $GITHUB_OUTPUT
+            # 分支推送逻辑
+            BRANCH=${GITHUB_REF#refs/*/}
+            BRANCHTRANSLATED=$(echo $BRANCH | tr '/' '_')
+            COMMIT_SHORT=$(git rev-parse --short=12 HEAD)
+            
+            echo "🌿 分支构建: $BRANCH"
+            
+            VERSION=""
+            if ${{ steps.semantic.outputs.new_release_published == 'true' }}; then
+              VERSION=${{ steps.semantic.outputs.new_release_version }}
+              echo "使用semantic-release版本: $VERSION"
+            else
+              VERSION="${BRANCHTRANSLATED}_${COMMIT_SHORT}"
+              echo "使用分支+commit版本: $VERSION"
+            fi
+            
+            echo "new_release=${{ steps.semantic.outputs.new_release_published }}" >> $GITHUB_OUTPUT
+            echo "short_ref=$BRANCHTRANSLATED" >> $GITHUB_OUTPUT
+            echo "sha_short=SHA-$COMMIT_SHORT" >> $GITHUB_OUTPUT
+            echo "version=$VERSION" >> $GITHUB_OUTPUT
+            echo "is_tag_build=false" >> $GITHUB_OUTPUT
           fi
       
       - name: Source checkout
