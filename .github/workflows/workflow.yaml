@@ -9,8 +9,6 @@ on:
   schedule:
     # 定时任务，例如每天凌晨2点编译指定tag
     - cron: '0 2 * * *'  # UTC时间，每天2:00 AM
-  workflow_dispatch:  # 保留手动触发选项
-
 env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
