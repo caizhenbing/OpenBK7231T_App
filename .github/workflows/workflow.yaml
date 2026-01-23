@@ -10,7 +10,7 @@ on:
 #      - 'release-*'    # 匹配所有release-开头的tag
 #      - 'build-*'      # 匹配所有build-开头的tag
       # 添加更多tag模式，或者使用具体tag名称
-      - 'specific-tag-name'  # 编译特定的tag
+      - '1.15.703'  # 编译特定的tag
       
   pull_request:
     branches: 
@@ -20,7 +20,7 @@ env:
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   APP_NAME: ${{ github.event.repository.name }}
   # 在这里指定要编译的tag（如果需要固定tag）
-  TARGET_TAG: "1.15.703"
+ # TARGET_TAG: "1.15.703"
 
 jobs:
   refs:
