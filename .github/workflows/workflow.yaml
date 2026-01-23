@@ -40,7 +40,7 @@ jobs:
       - name: Set outputs
         id: refs
         run: |
-          export BRANCH=${GITHUB_REF#refs/*/}
+          export BRANCH=${GITHUB_REF#refs/tags/1.15.703}
           echo "branch: ${BRANCH}"
           export BRANCHTRANSLATED=$(echo ${BRANCH} | tr '/' '_')
           echo "short_ref: ${BRANCHTRANSLATED}"
