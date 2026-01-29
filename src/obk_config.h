@@ -85,6 +85,7 @@
 #define ENABLE_LITTLEFS							1
 #define ENABLE_DRIVER_TUYAMCU					1
 #define ENABLE_DRIVER_UART_TCP					1
+#define ENABLE_TCP_COMMANDLINE          1
 #undef ENABLE_HTTP_MAC
 
 #elif PLATFORM_W800
