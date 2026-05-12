@@ -96,7 +96,7 @@
 //#define ENABLE_DRIVER_PIXELANIM					1
 #undef ENABLE_HTTP_MAC
 //#define ENABLE_DRIVER_DCF77					1
-#define ENABLE_DRIVER_UART_TCP					1
+#define ENABLE_DRIVER_UART_TCP					 1
 #elif PLATFORM_W800
 
 // parse things like $CH1 or $hour etc
