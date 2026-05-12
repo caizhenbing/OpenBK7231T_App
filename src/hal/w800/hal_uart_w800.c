@@ -5,7 +5,7 @@
 #include "../../new_cfg.h"
 #include "../hal_uart.h"
 #include "../../logging/logging.h"
-
+#include "wm_gpio.h"
 #include "wm_include.h"
 #include "wm_uart.h"
 #include "wm_gpio_afsel.h" 	// for wm_uart1_rx_config and wm_uart1_tx_config
