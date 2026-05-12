@@ -304,7 +304,7 @@ void UART_TCP_Init()
 	buf_size = reqbufsize > 16384 ? 16384 : reqbufsize;
 	g_conn_channel = Tokenizer_GetArgIntegerDefault(3, -1);
 	int flowcontrol = Tokenizer_GetArgIntegerDefault(4, 0);
-
+	UART_Deinit(0); 
 	UART_InitUART(g_baudRate, 1, flowcontrol > 0 ? true : false);
 	UART_InitReceiveRingBuffer(buf_size * 2);
 
