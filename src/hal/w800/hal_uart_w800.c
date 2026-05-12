@@ -62,14 +62,14 @@ int HAL_UART_Init(int baud, int parity, bool hwflowc, int txOverride, int rxOver
 
 		// ===== 新增：避开 BootROM 下载模式 =====
 		// 1. 等待 BootROM 彻底结束（200ms 很稳妥）
-		rtos_delay_milliseconds(200);
-		// 2. 把 UART1 的 RX (PB11) 和 TX (PB12) 强制设为 GPIO 输出，并输出高电平
-		//    防止引脚悬空被误判为下载请求
-		tls_gpio_cfg(WM_IO_PB_11, WM_GPIO_DIR_OUTPUT);
-		tls_gpio_write(WM_IO_PB_11, 1);
-		tls_gpio_cfg(WM_IO_PB_12, WM_GPIO_DIR_OUTPUT);
-		tls_gpio_write(WM_IO_PB_12, 1);
-		rtos_delay_milliseconds(50);
+rtos_delay_milliseconds(200);
+// 将 PB11、PB12 设为 GPIO 输出，浮空模式，并输出高电平
+// 第三个参数用 WM_GPIO_ATTR_FLOATING，如果没有此宏，可以直接写 0
+tls_gpio_cfg(WM_IO_PB_11, WM_GPIO_DIR_OUTPUT, WM_GPIO_ATTR_FLOATING);
+tls_gpio_write(WM_IO_PB_11, 1);
+tls_gpio_cfg(WM_IO_PB_12, WM_GPIO_DIR_OUTPUT, WM_GPIO_ATTR_FLOATING);
+tls_gpio_write(WM_IO_PB_12, 1);
+rtos_delay_milliseconds(50);
 		// =========================================
 
 		// 原有的引脚功能配置（会重新设为 UART 功能）
