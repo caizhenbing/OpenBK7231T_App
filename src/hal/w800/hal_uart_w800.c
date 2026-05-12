@@ -59,6 +59,20 @@ int HAL_UART_Init(int baud, int parity, bool hwflowc, int txOverride, int rxOver
 	if(!CFG_HasFlag(OBK_FLAG_USE_SECONDARY_UART))
 	{
 		used_uart = TLS_UART_1;
+
+		// ===== 新增：避开 BootROM 下载模式 =====
+		// 1. 等待 BootROM 彻底结束（200ms 很稳妥）
+		rtos_delay_milliseconds(200);
+		// 2. 把 UART1 的 RX (PB11) 和 TX (PB12) 强制设为 GPIO 输出，并输出高电平
+		//    防止引脚悬空被误判为下载请求
+		tls_gpio_cfg(WM_IO_PB_11, WM_GPIO_DIR_OUTPUT);
+		tls_gpio_write(WM_IO_PB_11, 1);
+		tls_gpio_cfg(WM_IO_PB_12, WM_GPIO_DIR_OUTPUT);
+		tls_gpio_write(WM_IO_PB_12, 1);
+		rtos_delay_milliseconds(50);
+		// =========================================
+
+		// 原有的引脚功能配置（会重新设为 UART 功能）
 		wm_uart1_cts_config(WM_IO_PB_09);
 		wm_uart1_rts_config(WM_IO_PB_10);
 		wm_uart1_rx_config(WM_IO_PB_11);
@@ -71,20 +85,6 @@ int HAL_UART_Init(int baud, int parity, bool hwflowc, int txOverride, int rxOver
 		wm_uart0_tx_config(WM_IO_PA_04);
 	}
 #else
-	if(!CFG_HasFlag(OBK_FLAG_USE_SECONDARY_UART))
-	{
-		used_uart = TLS_UART_1;
-		wm_uart1_cts_config(WM_IO_PB_19);
-		wm_uart1_rts_config(WM_IO_PB_20);
-		wm_uart1_rx_config(WM_IO_PB_07);
-		wm_uart1_tx_config(WM_IO_PB_06);
-	}
-	else
-	{
-		used_uart = TLS_UART_0;
-		wm_uart0_rx_config(WM_IO_PB_20);
-		wm_uart0_tx_config(WM_IO_PB_19);
-	}
 #endif
 
 	if(WM_SUCCESS != tls_uart_port_init(used_uart, &uart_opts, 1))
